@@ -1,4 +1,4 @@
-// RyGT loader: sets up Gran Turismo Sport from the player's own dump, firmware modules and fonts,
+﻿// RyGT loader: sets up Gran Turismo Sport from the player's own dump, firmware modules and fonts,
 // then starts it. Built with build.cmd (C# for .NET Framework 4.x, which Windows includes).
 // SPDX-License-Identifier: GPL-2.0-only
 
@@ -1097,8 +1097,10 @@ namespace RyGT
             settingsPage.Controls.Add(right, 1, 1);
 
             var display = Section(left, "Display");
+            AddVulkanDeviceSetting(display);
             AddScreenSettings(display);
             AddShapeSetting(display);
+            AddOption(display, "Fast flips (improves frame pacing)", "GPU", "fast_flips", false);
             AddOption(display, "Show an FPS counter", "General", "show_fps_counter", false);
             AddOption(display, "Show the splash screen while the game starts", "General", "show_splash", false);
             AddOption(display, "Show the game on Discord (Rich Presence)", "General", "discord_rpc_enabled", true);
@@ -1352,7 +1354,6 @@ namespace RyGT
             var extras = Section(right, "Enhancements");
             AddOption(extras, "PS4 Pro mode", "GPU", "ps4_pro", false);
             AddOption(extras, "Draw the UI at screen resolution", "GPU", "ui_hires", false);
-            AddOption(extras, "Fast flips (no 30 fps snapping)", "GPU", "fast_flips", false);
             AddOption(extras, "HDR (experimental; needs Windows HDR on)", "GPU", "hdr_allowed", false);
 
             // Shaders: the stored ones are built while the splash screen shows; a new one pauses
@@ -1802,6 +1803,82 @@ namespace RyGT
         // full_screen_mode, window_width/height, fullscreen_refresh_rate). The game draws at
         // 1920x1080 and runs at up to 60 fps; FSR or DLSS scale it to the screen, and a higher
         // refresh rate shows frame generation's extra frames.
+        void SaveVulkanDevice(VulkanDevice device)
+        {
+            var config = LoadConfig();
+            object found;
+            var section = config.TryGetValue("Vulkan", out found) ? found as Dictionary<string, object> : null;
+            if (section == null) { section = new Dictionary<string, object>(); config["Vulkan"] = section; }
+            section["gpu_id"] = device.Index;
+            // Extra identity fields are launcher-owned; the renderer consumes gpu_id.
+            section["device_uuid"] = device.Index < 0 ? "" : device.Uuid;
+            section["device_name"] = device.Index < 0 ? "" : device.Name;
+            Directory.CreateDirectory(Path.GetDirectoryName(ConfigPath));
+            File.WriteAllText(ConfigPath, new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(config),
+                              new UTF8Encoding(false));
+        }
+
+        void ResolveVulkanDevice()
+        {
+            string uuid = ReadStringSetting("Vulkan", "device_uuid", "");
+            int index = ReadIntSetting("Vulkan", "gpu_id", -1);
+            if (uuid.Length == 0 && index < 0) return;
+            var devices = VulkanDevices.Enumerate();
+            var device = uuid.Length != 0
+                ? devices.FirstOrDefault(d => string.Equals(d.Uuid, uuid, StringComparison.OrdinalIgnoreCase))
+                : devices.FirstOrDefault(d => d.Index == index);
+            if (device == null)
+                throw new Exception("The selected Vulkan device is unavailable. Choose another device or Automatic in Settings > Display.");
+            if (device.ApiVersion < ((1u << 22) | (3u << 12)))
+                throw new Exception("The selected device does not support Vulkan 1.3. Choose another Vulkan device in Settings > Display.");
+            if (device.Index != index || uuid.Length == 0) SaveVulkanDevice(device);
+        }
+
+        void AddVulkanDeviceSetting(TableLayoutPanel panel)
+        {
+            var row = new FlowLayoutPanel { AutoSize = true, BackColor = Color.Transparent,
+                Margin = new Padding(0, 2, 0, 2), WrapContents = false };
+            row.Controls.Add(new Label { Text = "Vulkan device", Width = 104, Height = 20,
+                BackColor = Color.Transparent, Margin = new Padding(0, 6, 8, 0) });
+            var combo = new DarkComboBox { DropDownStyle = ComboBoxStyle.DropDownList,
+                Width = 252, DropDownWidth = 500, FlatStyle = FlatStyle.Flat };
+            var automatic = new VulkanDevice { Index = -1, Name = "Automatic", Uuid = "" };
+            combo.Items.Add(automatic);
+            string uuid = ReadStringSetting("Vulkan", "device_uuid", "");
+            int index = ReadIntSetting("Vulkan", "gpu_id", -1);
+            VulkanDevice selected = uuid.Length == 0 && index < 0 ? automatic : null;
+            string error = null;
+            try
+            {
+                foreach (var device in VulkanDevices.Enumerate())
+                {
+                    if (device.ApiVersion < ((1u << 22) | (3u << 12))) device.Name += " (below Vulkan 1.3)";
+                    combo.Items.Add(device);
+                    if (uuid.Length != 0 ? string.Equals(device.Uuid, uuid, StringComparison.OrdinalIgnoreCase)
+                                         : device.Index == index) selected = device;
+                }
+            }
+            catch (Exception e) { error = "Could not list Vulkan devices: " + e.Message; }
+            if (selected == null)
+            {
+                selected = new VulkanDevice { Index = -2, Uuid = uuid,
+                    Name = ReadStringSetting("Vulkan", "device_name", "GPU " + index) + " (unavailable)" };
+                combo.Items.Add(selected);
+            }
+            combo.SelectedItem = selected;
+            combo.SelectedIndexChanged += delegate
+            {
+                var device = combo.SelectedItem as VulkanDevice;
+                if (device == null || device.Index == -2) return;
+                try { SaveVulkanDevice(device); }
+                catch (Exception e) { MessageBox.Show(this, "Could not save Vulkan device: " + e.Message); }
+            };
+            row.Controls.Add(combo);
+            panel.Controls.Add(row);
+            if (error != null) panel.Controls.Add(new Label { Text = error, AutoSize = true,
+                MaximumSize = new Size(365, 0), BackColor = Color.Transparent, ForeColor = Color.Silver });
+        }
+
         void AddScreenSettings(TableLayoutPanel panel)
         {
             int desktopWidth, desktopHeight, desktopHz;
@@ -2661,6 +2738,8 @@ namespace RyGT
         void Play()
         {
             if (!File.Exists(Exe)) { MessageBox.Show(this, "Press Set up first."); return; }
+            try { ResolveVulkanDevice(); }
+            catch (Exception e) { MessageBox.Show(this, e.Message); return; }
             // Without its data index GT Sport closes right after the splash screen.
             string dataProblem = ReadProblem(Path.Combine(root, "app0", "gt.idx"), -1);
             if (dataProblem != null)
