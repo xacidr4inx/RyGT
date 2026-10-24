@@ -1099,6 +1099,7 @@ namespace RyGT
             var display = Section(left, "Display");
             AddScreenSettings(display);
             AddShapeSetting(display);
+            AddOption(display, "Fast flips (improves frame pacing)", "GPU", "fast_flips", false);
             AddOption(display, "Show an FPS counter", "General", "show_fps_counter", false);
             AddOption(display, "Show the splash screen while the game starts", "General", "show_splash", false);
             AddOption(display, "Show the game on Discord (Rich Presence)", "General", "discord_rpc_enabled", true);
@@ -1352,7 +1353,6 @@ namespace RyGT
             var extras = Section(right, "Enhancements");
             AddOption(extras, "PS4 Pro mode", "GPU", "ps4_pro", false);
             AddOption(extras, "Draw the UI at screen resolution", "GPU", "ui_hires", false);
-            AddOption(extras, "Fast flips (no 30 fps snapping)", "GPU", "fast_flips", false);
             AddOption(extras, "HDR (experimental; needs Windows HDR on)", "GPU", "hdr_allowed", false);
 
             // Shaders: the stored ones are built while the splash screen shows; a new one pauses

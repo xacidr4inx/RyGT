@@ -317,3 +317,25 @@ staging baseline.
 
 Only the production cache/lifetime changes are included. Curve traces, allocation
 inventories, capture helpers, diagnostic flags, and compiled artifacts are excluded.
+
+Patch 0072 applies after 0071. Native recognizes GT Sport's bounded two-word
+buffer-fill shader and records equivalent GPU transfers: a buffer fill for a
+uniform value, or a copy from the existing bounded pattern cache for alternating
+values. Only the three argument words read by this known shader are captured
+from its CPU parameter record. GPU-backed arguments and unsupported dispatch
+shapes retain the compute path; barriers, image invalidation and GPU retirement
+remain in place.
+
+In the matched Dragon Trail Seaside Time Trial results screen, 63 clears fell
+from about 10.5 ms to 0.59 ms in the local GPU timing samples, and performance rose
+from 48 to 60 FPS. The two matching captures had streaming off and periodic
+instrumentation readbacks suppressed. Two track/menu cycles also retained correct
+rendering and good performance, including the requested shadow and spark checks.
+These results describe the tested NVIDIA system, not a guarantee for every GPU.
+
+The launcher exposes the existing `GPU.fast_flips` option under Settings > Display
+as "Fast flips (improves frame pacing)". Its saved value and default are unchanged.
+This controls internal presentation scheduling; it does not enable monitor VRR.
+
+Temporary GPU timing, bloom/color probes, capture helpers, activation logs,
+experimental upload-chunk sizing and compiled artifacts are excluded from 0072.
