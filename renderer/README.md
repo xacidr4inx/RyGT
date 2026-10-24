@@ -338,3 +338,18 @@ On the RX 7600, deleting the store by hand made the colours right again; this pa
 does that step automatically. It was compiled with the Release flags; the automatic
 set-aside has not yet been run in the game. Only `cache_storage.cpp` changes; it is
 the same at shadGT `1d13c88d` and after patches 0020 and 0059-0071.
+
+## MED3 quiet-NaN semantics and shader cache refresh (0078)
+
+The SPIR-V fallback now implements GCN MED3's quiet-NaN minimum behavior instead
+of turning an invalid material color into 65000. The AMD trinary instruction path
+and bloom strengths stay unchanged. Every shader binary specialization family
+gets a new semantic revision; old binaries are rejected and translated again.
+The shader folder does not need manual deletion; first-use compilation is expected.
+
+Validation includes 2,000 MED3 instruction cases, 23 revision-discovery cases,
+the Release renderer build and 2,610 local import bindings. The source-generated
+build removed the Subaru window glow and broad bright-car camera pass. Other
+passes, track-to-menu transitions, distant shadows and performance remained correct.
+Diagnostics and cached probe shaders are excluded. The separately reported AMD
+driver pipeline-compiler crash is not established as fixed by this change.
