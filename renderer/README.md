@@ -339,3 +339,18 @@ This controls internal presentation scheduling; it does not enable monitor VRR.
 
 Temporary GPU timing, bloom/color probes, capture helpers, activation logs,
 experimental upload-chunk sizing and compiled artifacts are excluded from 0072.
+
+Patch 0073 prevents Native from reusing layered render targets whose guest-memory
+slice strides differ. Before reusing a depth or color array, it checks each mip's
+per-layer byte footprint, offset, pitch and padded height. Single-layer reuse and
+compatible shadow-array views with different layer counts remain supported.
+
+The captured bloom failure reused a 480x270 two-layer target for a 180x170
+request with a different slice footprint. The corrected build creates the matching
+target instead; local transmission/loading, showroom and track checks rendered
+correctly. Eight focused layout cases pass, including the captured mismatch and
+compatible 14/13-layer shadow views. The Release build and all 2,610 checked local
+import bindings passed. The rare red/green defect still needs longer observation;
+this patch does not claim that every intermittent rendering issue is resolved.
+Only the layer-layout correction is included; diagnostic probes, traces, captures,
+compiled artifacts and unrelated performance experiments are excluded.
