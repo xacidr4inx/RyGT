@@ -318,60 +318,38 @@ staging baseline.
 Only the production cache/lifetime changes are included. Curve traces, allocation
 inventories, capture helpers, diagnostic flags, and compiled artifacts are excluded.
 
-Patch 0072 applies after 0071. Native recognizes GT Sport's bounded two-word
-buffer-fill shader and records equivalent GPU transfers: a buffer fill for a
-uniform value, or a copy from the existing bounded pattern cache for alternating
-values. Only the three argument words read by this known shader are captured
-from its CPU parameter record. GPU-backed arguments and unsupported dispatch
-shapes retain the compute path; barriers, image invalidation and GPU retirement
-remain in place.
+## Shader store version (0072)
 
-In the matched Dragon Trail Seaside Time Trial results screen, 63 clears fell
-from about 10.5 ms to 0.59 ms in the local GPU timing samples, and performance rose
-from 48 to 60 FPS. The two matching captures had streaming off and periodic
-instrumentation readbacks suppressed. Two track/menu cycles also retained correct
-rendering and good performance, including the requested shadow and spark checks.
-These results describe the tested NVIDIA system, not a guarantee for every GPU.
+Patch 0072 (FIX-213) applies after 0071. Stored shader translations
+(`<RyGT folder>\shaders\<serial>-direct-sets`) load unchecked, so after an update
+that changes how shaders are translated, the store kept the old translations and
+drew with them. On an RX 7600 (driver 26.8.1) the update to PR #88 drew a magenta
+car and red scenery until the folder was deleted by hand, as 0060's note already
+asks for.
 
-The launcher exposes the existing `GPU.fast_flips` option under Settings > Display
-as "Fast flips (improves frame pacing)". Its saved value and default are unchanged.
-This controls internal presentation scheduling; it does not enable monitor VRR.
+The store now carries a version (`store-version.txt` inside it). A store without
+the current version is set aside as `<store>.outdated` and starts again, and the
+launcher's shader pack stamp (`shaders-pack.txt`) is removed with it, so the next
+Play prepares the shader pack into the new store. The first Play after the update
+translates the shaders again, which takes a few minutes once. Raise `StoreVersion`
+in `cache_storage.cpp` whenever a change makes stored translations wrong.
 
-Temporary GPU timing, bloom/color probes, capture helpers, activation logs,
-experimental upload-chunk sizing and compiled artifacts are excluded from 0072.
+On the RX 7600, deleting the store by hand made the colours right again; this patch
+does that step automatically. It was compiled with the Release flags; the automatic
+set-aside has not yet been run in the game. Only `cache_storage.cpp` changes; it is
+the same at shadGT `1d13c88d` and after patches 0020 and 0059-0071.
 
-Patch 0073 prevents Native from reusing layered render targets whose guest-memory
-slice strides differ. Before reusing a depth or color array, it checks each mip's
-per-layer byte footprint, offset, pitch and padded height. Single-layer reuse and
-compatible shadow-array views with different layer counts remain supported.
+## MED3 quiet-NaN semantics and shader cache refresh (0078)
 
-The captured bloom failure reused a 480x270 two-layer target for a 180x170
-request with a different slice footprint. The corrected build creates the matching
-target instead; local transmission/loading, showroom and track checks rendered
-correctly. Eight focused layout cases pass, including the captured mismatch and
-compatible 14/13-layer shadow views. The Release build and all 2,610 checked local
-import bindings passed. The rare red/green defect still needs longer observation;
-this patch does not claim that every intermittent rendering issue is resolved.
-Only the layer-layout correction is included; diagnostic probes, traces, captures,
-compiled artifacts and unrelated performance experiments are excluded.
+The SPIR-V fallback now implements GCN MED3's quiet-NaN minimum behavior instead
+of turning an invalid material color into 65000. The AMD trinary instruction path
+and bloom strengths stay unchanged. Every shader binary specialization family
+gets a new semantic revision; old binaries are rejected and translated again.
+The shader folder does not need manual deletion; first-use compilation is expected.
 
-## MED3 quiet-NaN semantics and shader cache refresh (0074)
-
-Patch 0074 fixes the SPIR-V fallback for GCN MED3 when an operand is a quiet NaN.
-The old min/max expansion could turn an invalid material color into 65000, causing
-white car materials and excessive bloom. The fallback now selects the minimum of
-the numeric operands for a quiet-NaN input; the AMD trinary-instruction path stays
-unchanged. This changes instruction semantics, not bloom strength.
-
-The shader binary revision advances for every existing specialization family. Old
-metadata remains recognizable for discovery, but its binaries are rejected and
-translated again instead of retaining the incorrect code. Expect shader compilation
-on first use after updating; the shader directory does not need manual deletion.
-
-Validation: 2,000 MED3 cases across the fallback and native paths, 23 cache revision
-discovery cases, Release renderer build, and 2,610 local import bindings checked.
-The source-generated build corrected the Subaru window halo and bright-car camera
-pass locally; the remaining camera passes, track-to-menu transition, distant shadows,
-geometry and performance were reported correct. Diagnostics, cached probe shaders
-and build outputs are not included. This does not establish a fix for the separately
-reported AMD driver pipeline-compilation crash.
+Validation includes 2,000 MED3 instruction cases, 23 revision-discovery cases,
+the Release renderer build and 2,610 local import bindings. The source-generated
+build removed the Subaru window glow and broad bright-car camera pass. Other
+passes, track-to-menu transitions, distant shadows and performance remained correct.
+Diagnostics and cached probe shaders are excluded. The separately reported AMD
+driver pipeline-compiler crash is not established as fixed by this change.
