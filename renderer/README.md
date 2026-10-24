@@ -318,39 +318,37 @@ staging baseline.
 Only the production cache/lifetime changes are included. Curve traces, allocation
 inventories, capture helpers, diagnostic flags, and compiled artifacts are excluded.
 
-Patch 0072 applies after 0071. Native recognizes GT Sport's bounded two-word
-buffer-fill shader and records equivalent GPU transfers: a buffer fill for a
-uniform value, or a copy from the existing bounded pattern cache for alternating
-values. Only the three argument words read by this known shader are captured
-from its CPU parameter record. GPU-backed arguments and unsupported dispatch
-shapes retain the compute path; barriers, image invalidation and GPU retirement
-remain in place.
+## Shader store version (0072)
 
-In the matched Dragon Trail Seaside Time Trial results screen, 63 clears fell
-from about 10.5 ms to 0.59 ms in the local GPU timing samples, and performance rose
-from 48 to 60 FPS. The two matching captures had streaming off and periodic
-instrumentation readbacks suppressed. Two track/menu cycles also retained correct
-rendering and good performance, including the requested shadow and spark checks.
-These results describe the tested NVIDIA system, not a guarantee for every GPU.
+Patch 0072 (FIX-213) applies after 0071. Stored shader translations
+(`<RyGT folder>\shaders\<serial>-direct-sets`) load unchecked, so after an update
+that changes how shaders are translated, the store kept the old translations and
+drew with them. On an RX 7600 (driver 26.8.1) the update to PR #88 drew a magenta
+car and red scenery until the folder was deleted by hand, as 0060's note already
+asks for.
 
-The launcher exposes the existing `GPU.fast_flips` option under Settings > Display
-as "Fast flips (improves frame pacing)". Its saved value and default are unchanged.
-This controls internal presentation scheduling; it does not enable monitor VRR.
+The store now carries a version (`store-version.txt` inside it). A store without
+the current version is set aside as `<store>.outdated` and starts again, and the
+launcher's shader pack stamp (`shaders-pack.txt`) is removed with it, so the next
+Play prepares the shader pack into the new store. The first Play after the update
+translates the shaders again, which takes a few minutes once. Raise `StoreVersion`
+in `cache_storage.cpp` whenever a change makes stored translations wrong.
 
-Temporary GPU timing, bloom/color probes, capture helpers, activation logs,
-experimental upload-chunk sizing and compiled artifacts are excluded from 0072.
+On the RX 7600, deleting the store by hand made the colours right again; this patch
+does that step automatically. It was compiled with the Release flags; the automatic
+set-aside has not yet been run in the game. Only `cache_storage.cpp` changes; it is
+the same at shadGT `1d13c88d` and after patches 0020 and 0059-0071.
 
-Patch 0073 prevents Native from reusing layered render targets whose guest-memory
-slice strides differ. Before reusing a depth or color array, it checks each mip's
-per-layer byte footprint, offset, pitch and padded height. Single-layer reuse and
-compatible shadow-array views with different layer counts remain supported.
+## Native pattern-transfer fills (0076)
 
-The captured bloom failure reused a 480x270 two-layer target for a 180x170
-request with a different slice footprint. The corrected build creates the matching
-target instead; local transmission/loading, showroom and track checks rendered
-correctly. Eight focused layout cases pass, including the captured mismatch and
-compatible 14/13-layer shadow views. The Release build and all 2,610 checked local
-import bindings passed. The rare red/green defect still needs longer observation;
-this patch does not claim that every intermittent rendering issue is resolved.
-Only the layer-layout correction is included; diagnostic probes, traces, captures,
-compiled artifacts and unrelated performance experiments are excluded.
+Native recognizes the bounded two-word buffer-fill shader and records equivalent
+GPU transfers: a uniform fill or a copy from the bounded alternating-pattern cache.
+Only the three argument words read by the known shader are captured. GPU-backed
+arguments and unsupported dispatch shapes retain the compute path. Barriers,
+image invalidation and deferred GPU retirement remain in place.
+
+Matched Dragon Trail Time Trial results-screen samples with streaming off reduced
+63 clear dispatches from about 10.5 ms to 0.59 ms and increased 48 FPS to 60 FPS
+on the tested NVIDIA machine. Two track/menu cycles retained correct shadows,
+geometry, lighting and sparks. These are local results, not a guarantee for all GPUs.
+Temporary timing, upload-chunk comparisons, shader probes and binaries are excluded.
