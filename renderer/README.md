@@ -338,3 +338,16 @@ On the RX 7600, deleting the store by hand made the colours right again; this pa
 does that step automatically. It was compiled with the Release flags; the automatic
 set-aside has not yet been run in the game. Only `cache_storage.cpp` changes; it is
 the same at shadGT `1d13c88d` and after patches 0020 and 0059-0071.
+
+## Layered render-target reuse (0077)
+
+Native checks each mip's per-layer byte footprint, offset, pitch and padded height
+before reusing a layered depth or color target. Single-layer reuse and compatible
+shadow-array views with different layer counts remain supported.
+
+The captured failure reused a 480x270 two-layer target for a 180x170 request with
+a different slice footprint. Eight focused cases include this mismatch and
+compatible 14/13-layer shadow views. The Release build and 2,610 import bindings
+passed, and transmission/loading, showroom and track checks rendered correctly.
+This does not claim to resolve every intermittent red/green defect. Only the
+layout correction is included; probes, traces and performance experiments stay local.
