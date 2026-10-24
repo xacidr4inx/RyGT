@@ -338,3 +338,17 @@ On the RX 7600, deleting the store by hand made the colours right again; this pa
 does that step automatically. It was compiled with the Release flags; the automatic
 set-aside has not yet been run in the game. Only `cache_storage.cpp` changes; it is
 the same at shadGT `1d13c88d` and after patches 0020 and 0059-0071.
+
+## Native pattern-transfer fills (0076)
+
+Native recognizes the bounded two-word buffer-fill shader and records equivalent
+GPU transfers: a uniform fill or a copy from the bounded alternating-pattern cache.
+Only the three argument words read by the known shader are captured. GPU-backed
+arguments and unsupported dispatch shapes retain the compute path. Barriers,
+image invalidation and deferred GPU retirement remain in place.
+
+Matched Dragon Trail Time Trial results-screen samples with streaming off reduced
+63 clear dispatches from about 10.5 ms to 0.59 ms and increased 48 FPS to 60 FPS
+on the tested NVIDIA machine. Two track/menu cycles retained correct shadows,
+geometry, lighting and sparks. These are local results, not a guarantee for all GPUs.
+Temporary timing, upload-chunk comparisons, shader probes and binaries are excluded.
