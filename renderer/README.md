@@ -354,3 +354,24 @@ import bindings passed. The rare red/green defect still needs longer observation
 this patch does not claim that every intermittent rendering issue is resolved.
 Only the layer-layout correction is included; diagnostic probes, traces, captures,
 compiled artifacts and unrelated performance experiments are excluded.
+
+## MED3 quiet-NaN semantics and shader cache refresh (0074)
+
+Patch 0074 fixes the SPIR-V fallback for GCN MED3 when an operand is a quiet NaN.
+The old min/max expansion could turn an invalid material color into 65000, causing
+white car materials and excessive bloom. The fallback now selects the minimum of
+the numeric operands for a quiet-NaN input; the AMD trinary-instruction path stays
+unchanged. This changes instruction semantics, not bloom strength.
+
+The shader binary revision advances for every existing specialization family. Old
+metadata remains recognizable for discovery, but its binaries are rejected and
+translated again instead of retaining the incorrect code. Expect shader compilation
+on first use after updating; the shader directory does not need manual deletion.
+
+Validation: 2,000 MED3 cases across the fallback and native paths, 23 cache revision
+discovery cases, Release renderer build, and 2,610 local import bindings checked.
+The source-generated build corrected the Subaru window halo and bright-car camera
+pass locally; the remaining camera passes, track-to-menu transition, distant shadows,
+geometry and performance were reported correct. Diagnostics, cached probe shaders
+and build outputs are not included. This does not establish a fix for the separately
+reported AMD driver pipeline-compilation crash.
